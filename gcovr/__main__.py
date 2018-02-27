@@ -40,6 +40,7 @@ from os.path import normpath
 from .gcov import get_datafiles, process_existing_gcov_file, process_datafile
 from .utils import get_global_stats, build_filter, Logger
 from .version import __version__
+from .workers import Workers
 
 # generators
 from .cobertura_xml_generator import print_xml_report
@@ -83,6 +84,18 @@ class PercentageOption (Option):
     TYPE_CHECKER = copy.copy(Option.TYPE_CHECKER)
     TYPE_CHECKER["percentage"] = check_percentage
 
+def parallel_callback(option, opt_str, value, parser):
+    assert value is None
+    value = None
+    for arg in parser.rargs:
+        if value is not None or arg[:1] == "-":
+            break
+        value = int(arg)
+    if value is None:
+        value = 0
+    else:
+        del parser.rargs[0]
+    setattr(parser.values, option.dest, value)
 
 def parse_arguments(args):
     """
@@ -379,7 +392,14 @@ def parse_arguments(args):
         dest="delete",
         default=False
     )
-
+    parser.add_option(
+        "-j",
+        help="Set the number of threads to use in parallel.",
+        action="callback",
+        callback=parallel_callback,
+        dest="gcov_parallel",
+        default=1
+    )
     return parser.parse_args(args=args)
 
 
@@ -474,13 +494,16 @@ def main(args=None):
 
     # Get coverage data
     covdata = {}
+    pool = Workers(options.gcov_parallel)
+    if options.verbose:
+        print("Pool started with %d workers" % pool.size())
     for file_ in datafiles:
         if options.gcov_files:
-            process_existing_gcov_file(file_, covdata, options)
+            pool.add(process_existing_gcov_file, file_, covdata, options)
         else:
-            process_datafile(file_, covdata, options)
+            pool.add(process_datafile, file_, covdata, options)
+    pool.wait()
     logger.verbose_msg("Gathered coveraged data for {} files", len(covdata))
-
     # Print report
     if options.xml or options.prettyxml:
         print_xml_report(covdata, options)

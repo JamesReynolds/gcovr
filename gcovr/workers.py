@@ -9,6 +9,7 @@
 
 from threading import Thread
 
+
 class WorkThread(Thread):
     """
     The work thread class continuously gets work and
@@ -36,7 +37,8 @@ class WorkThread(Thread):
                     continue
                 work(*args, **kwargs)
         finally:
-          self.shutdown = True
+            self.shutdown = True
+
 
 class Workers(object):
     """
@@ -85,5 +87,5 @@ class Workers(object):
             while self.q.qsize() > 0:
                 time.sleep(1)
         finally:
-           for w in self.workers:
-               w.shutdown = True
+            for w in self.workers:
+                w.shutdown = True

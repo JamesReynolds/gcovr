@@ -84,18 +84,26 @@ class PercentageOption (Option):
     TYPE_CHECKER = copy.copy(Option.TYPE_CHECKER)
     TYPE_CHECKER["percentage"] = check_percentage
 
+
 def parallel_callback(option, opt_str, value, parser):
+    """
+    Callback to set -j flag if present
+    """
     assert value is None
     value = None
     for arg in parser.rargs:
         if value is not None or arg[:1] == "-":
             break
-        value = int(arg)
+        try:
+            value = int(arg)
+        except ValueError:
+            break
     if value is None:
         value = 0
     else:
         del parser.rargs[0]
     setattr(parser.values, option.dest, value)
+
 
 def parse_arguments(args):
     """
@@ -409,7 +417,6 @@ COPYRIGHT = (
     "Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,\n"
     "the U.S. Government retains certain rights in this software."
 )
-
 
 def main(args=None):
     global options

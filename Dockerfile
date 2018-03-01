@@ -14,8 +14,15 @@ RUN yum install -y python27-python-pip
 
 RUN source scl_source enable python27 devtoolset-6 && pip install pytest pyutilib
 
+RUN yum install -y epel-release
+RUN yum install -y python34-setuptools
+RUN easy_install-3.4 pip
+RUN pip install pytest pyutilib
+
+
 RUN mkdir gcovr
 COPY ./ gcovr/
-RUN find gcovr -name *.pyc -delete
 RUN source scl_source enable python27 devtoolset-6 && cd gcovr && pip install -e .
-CMD source scl_source enable python27 devtoolset-6 && cd gcovr && python -m pytest -v
+RUN cd gcovr && pip install -e .
+
+CMD cd gcovr && source scl_source enable devtoolset-6 && python3.4 -m pytest -v && source scl_source enable python27 && python -m pytest -v

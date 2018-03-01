@@ -9,6 +9,12 @@
 
 from threading import Thread
 
+import sys
+if sys.version_info[0] >= 3:
+    from queue import Queue, Empty
+else:
+    from Queue import Queue, Empty
+
 
 class WorkThread(Thread):
     """
@@ -28,7 +34,6 @@ class WorkThread(Thread):
         """
         Run until the shutdown flag is set
         """
-        from Queue import Empty
         try:
             while not self.shutdown:
                 try:
@@ -50,7 +55,6 @@ class Workers(object):
         """
         Initialise with a number of workers
         """
-        from Queue import Queue
         self.q = Queue()
         if number == 0:
             from multiprocessing import cpu_count

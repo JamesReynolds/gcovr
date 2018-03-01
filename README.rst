@@ -5,7 +5,7 @@ generate GCC code coverage reports
 
 website_ • documentation_ • bugtracker_ • `GitHub <repo_>`_
 
-|travis-ci-badge| |appveyor-ci-badge| |pypi-badge| |codecov-badge|
+|travis-ci-badge|
 
 .. begin abstract
 
@@ -44,20 +44,11 @@ Example HTML details:
 
 .. _website:        http://gcovr.com/
 .. _documentation:  http://gcovr.com/guide.html
-.. _repo:       https://github.com/gcovr/gcovr/
-.. _bugtracker: https://github.com/gcovr/gcovr/issues
-.. |travis-ci-badge| image:: https://travis-ci.org/gcovr/gcovr.svg?branch=master
-   :target: https://travis-ci.org/gcovr/gcovr
+.. _repo:       https://github.com/JamesReynolds/gcovr/
+.. _bugtracker: https://github.com/JamesReynolds/gcovr/issues
+.. |travis-ci-badge| image:: https://travis-ci.org/JamesReynolds/gcovr.svg?branch=master
+   :target: https://travis-ci.org/JamesReynolds/gcovr
    :alt: Travis CI build status
-.. |appveyor-ci-badge| image:: https://ci.appveyor.com/api/projects/status/6amtekih63rg9f2v/branch/master?svg=true
-   :target: https://ci.appveyor.com/project/latk/gcovr-0p8sb/branch/master
-   :alt: Appveyor CI build status
-.. |pypi-badge| image:: https://img.shields.io/pypi/v/gcovr.svg
-   :target: https://pypi.python.org/pypi/gcovr
-   :alt: install from PyPI
-.. |codecov-badge| image:: https://codecov.io/gh/gcovr/gcovr/branch/master/graph/badge.svg
-   :target: https://codecov.io/gh/gcovr/gcovr/branch/master
-   :alt: Codecov status
 
 Installation
 ------------
@@ -78,7 +69,7 @@ Install development version from GitHub:
 
 .. code:: bash
 
-    pip install git+https://github.com/gcovr/gcovr.git
+    pip install git+https://github.com/JamesReynolds/gcovr.git
 
 .. warning::
     Even though gcovr could be used as a single python script file,

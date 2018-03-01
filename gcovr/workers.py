@@ -56,6 +56,8 @@ class Workers(object):
             from multiprocessing import cpu_count
             number = cpu_count()
         self.workers = [WorkThread(self) for _ in xrange(0, number)]
+        if number == 1:
+            return
         for w in self.workers:
             w.start()
 
@@ -64,7 +66,10 @@ class Workers(object):
         Add in a method and the arguments to be used
         when running it
         """
-        self.q.put((work, args, kwargs))
+        if len(self.workers) <= 1:
+            work(*args, **kwargs)
+        else:
+            self.q.put((work, args, kwargs))
 
     def size(self):
         """

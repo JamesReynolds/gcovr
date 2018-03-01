@@ -55,7 +55,7 @@ class Workers(object):
         if number == 0:
             from multiprocessing import cpu_count
             number = cpu_count()
-        self.workers = [WorkThread(self) for _ in xrange(0, number)]
+        self.workers = [WorkThread(self) for _ in range(0, number)]
         if number == 1:
             return
         for w in self.workers:

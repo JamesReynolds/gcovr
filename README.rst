@@ -9,6 +9,9 @@ website_ • documentation_ • bugtracker_ • `GitHub <repo_>`_
 
 .. begin abstract
 
+This is a fork of the main _gcovr repository to attempt to parallel
+execution.
+
 Gcovr provides a utility for managing the use of the GNU gcov_ utility
 and generating summarized code coverage results. This command is
 inspired by the Python coverage.py_ package, which provides a similar
@@ -31,6 +34,7 @@ text summaries and XML reports.
 .. _coverage.py: http://nedbatchelder.com/code/coverage/
 .. _cobertura: http://cobertura.sourceforge.net/
 .. _lcov: http://ltp.sourceforge.net/coverage/lcov.php
+.. _gcovr: https://github.com/gcovr/gcovr
 
 .. end abstract
 

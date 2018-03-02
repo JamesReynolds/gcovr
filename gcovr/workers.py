@@ -28,21 +28,17 @@ class WorkThread(Thread):
         """
         super(WorkThread, self).__init__()
         self.pool = pool
-        self.shutdown = False
 
     def run(self):
         """
-        Run until the shutdown flag is set
+        Run until the queue is empty
         """
-        try:
-            while not self.shutdown:
-                try:
-                    work, args, kwargs = self.pool.get()
-                except Empty:
-                    continue
-                work(*args, **kwargs)
-        finally:
-            self.shutdown = True
+        while True:
+            try:
+                work, args, kwargs = self.pool.get()
+            except Empty:
+                break
+            work(*args, **kwargs)
 
 
 class Workers(object):
@@ -60,20 +56,13 @@ class Workers(object):
             from multiprocessing import cpu_count
             number = cpu_count()
         self.workers = [WorkThread(self) for _ in range(0, number)]
-        if number == 1:
-            return
-        for w in self.workers:
-            w.start()
 
     def add(self, work, *args, **kwargs):
         """
         Add in a method and the arguments to be used
         when running it
         """
-        if len(self.workers) <= 1:
-            work(*args, **kwargs)
-        else:
-            self.q.put((work, args, kwargs))
+        self.q.put((work, args, kwargs))
 
     def size(self):
         """
@@ -91,10 +80,7 @@ class Workers(object):
         """
         Wait until all work is complete
         """
-        try:
-            import time
-            while self.q.qsize() > 0:
-                time.sleep(1)
-        finally:
-            for w in self.workers:
-                w.shutdown = True
+        for w in self.workers:
+            w.start()
+        for w in self.workers:
+            w.join()

@@ -464,7 +464,6 @@ def process_datafile(filename, covdata, options):
         #
         dir_ = potential_wd.pop(0)
         # print "X DIR:", dir_
-        os.chdir(dir_)
 
         if options.verbose:
             sys.stdout.write(
@@ -472,6 +471,7 @@ def process_datafile(filename, covdata, options):
             )
         out, err = subprocess.Popen(
             cmd, env=env,
+            cwd=dir_,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE).communicate()
         out = out.decode('utf-8')
@@ -512,7 +512,7 @@ def process_datafile(filename, covdata, options):
             # Process *.gcov files
             #
             for fname in gcov_files['active']:
-                process_gcov_data(fname, covdata, abs_filename, options)
+                process_gcov_data(os.path.join(dir_, fname), covdata, abs_filename, options)
             Done = True
 
         if not options.keep:
@@ -522,7 +522,6 @@ def process_datafile(filename, covdata, options):
                         # Only remove files that actually exist.
                         os.remove(fname)
 
-    os.chdir(options.root_dir)
     if options.delete:
         if not abs_filename.endswith('gcno'):
             os.remove(abs_filename)

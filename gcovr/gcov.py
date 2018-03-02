@@ -15,6 +15,7 @@ from os.path import normpath
 
 from .coverage import CoverageData
 from .utils import aliases, search_file
+from .workers import locked_directory
 
 output_re = re.compile("[Cc]reating [`'](.*)'$")
 source_re = re.compile("[Cc]annot open (source|graph) file")
@@ -89,7 +90,7 @@ def is_non_code(code):
 #
 # Process a single gcov datafile
 #
-def process_gcov_data(data_fname, covdata, source_fname, options):
+def process_gcov_data(data_fname, covdata, source_fname, options, currdir=None):
     INPUT = open(data_fname, "r")
     #
     # Get the filename
@@ -99,12 +100,13 @@ def process_gcov_data(data_fname, covdata, source_fname, options):
     if len(segments) != 4 or not \
             segments[2].lower().strip().endswith('source'):
         raise RuntimeError(
-            'Fatal error parsing gcov file, line 1: \n\t"%s"' % line.rstrip()
+            'Fatal error parsing gcov file %s, line 1: \n\t"%s"' % (data_fname, line.rstrip())
         )
     #
     # Find the source file
     #
-    currdir = os.getcwd()
+    if currdir is None:
+        currdir = os.getcwd()
     root_dir = options.root_dir
     if source_fname is None:
         common_dir = os.path.commonprefix([data_fname, currdir])
@@ -362,7 +364,7 @@ def process_gcov_data(data_fname, covdata, source_fname, options):
 # identifying the original gcc working directory (there is a bit of
 # trial-and-error here)
 #
-def process_datafile(filename, covdata, options):
+def process_datafile(filename, covdata, options, workdir=None):
     if options.verbose:
         print("Processing file: " + filename)
     #
@@ -439,6 +441,10 @@ def process_datafile(filename, covdata, options):
         # Always add the root directory
         potential_wd.append(options.root_dir)
 
+    # Ensure that the working directory for thread is first as
+    # systems with absolute paths will work
+    potential_wd = [workdir] + potential_wd
+
     #
     # If the first element of cmd - the executable name - has embedded spaces
     # it probably includes extra arguments.
@@ -463,43 +469,48 @@ def process_datafile(filename, covdata, options):
         # directory
         #
         dir_ = potential_wd.pop(0)
+        if workdir is None:
+            workdir = dir_
         # print "X DIR:", dir_
 
-        if options.verbose:
-            sys.stdout.write(
-                "Running gcov: '%s' in '%s'\n" % (' '.join(cmd), os.getcwd())
-            )
-        out, err = subprocess.Popen(
-            cmd, env=env,
-            cwd=dir_,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE).communicate()
-        out = out.decode('utf-8')
-        err = err.decode('utf-8')
+        with locked_directory(dir_):
+            if options.verbose:
+                sys.stdout.write(
+                    "Running gcov: '%s' in '%s'\n" % (' '.join(cmd), os.getcwd())
+                )
+            out, err = subprocess.Popen(
+                cmd, env=env,
+                cwd=dir_,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE).communicate()
+            out = out.decode('utf-8')
+            err = err.decode('utf-8')
 
-        # find the files that gcov created
-        gcov_files = {'active': [], 'filter': [], 'exclude': []}
-        for line in out.splitlines():
-            found = output_re.search(line.strip())
-            if found is not None:
-                fname = found.group(1)
-                if not options.gcov_filter.match(fname):
-                    if options.verbose:
-                        sys.stdout.write("Filtering gcov file %s\n" % fname)
-                    gcov_files['filter'].append(fname)
-                    continue
-                exclude = False
-                for exc in options.gcov_exclude:
-                    if exc.match(options.gcov_filter.sub('', fname)) or \
-                            exc.match(fname) or \
-                            exc.match(os.path.abspath(fname)):
-                        exclude = True
-                        break
-                if not exclude:
-                    gcov_files['active'].append(fname)
-                elif options.verbose:
-                    sys.stdout.write("Excluding gcov file %s\n" % fname)
-                    gcov_files['exclude'].append(fname)
+            # find the files that gcov created
+            gcov_files = {'active': [], 'filter': [], 'exclude': []}
+            for line in out.splitlines():
+                found = output_re.search(line.strip())
+                if found is not None:
+                    fname = found.group(1)
+                    if not options.gcov_filter.match(fname):
+                        if options.verbose:
+                            sys.stdout.write("Filtering gcov file %s\n" % fname)
+                        gcov_files['filter'].append(fname)
+                        continue
+                    exclude = False
+                    for exc in options.gcov_exclude:
+                            if exc.match(options.gcov_filter.sub('', fname)) or \
+                                    exc.match(fname) or \
+                                    exc.match(os.path.abspath(fname)):
+                                exclude = True
+                            break
+                    if not exclude:
+                        gcov_files['active'].append(fname)
+                        import shutil
+                        shutil.move(os.path.join(dir_, fname), os.path.join(workdir, fname))
+                    elif options.verbose:
+                        sys.stdout.write("Excluding gcov file %s\n" % fname)
+                        gcov_files['exclude'].append(fname)
 
         # print "HERE", err, "XXX", source_re.search(err)
         if source_re.search(err):
@@ -512,7 +523,7 @@ def process_datafile(filename, covdata, options):
             # Process *.gcov files
             #
             for fname in gcov_files['active']:
-                process_gcov_data(os.path.join(dir_, fname), covdata, abs_filename, options)
+                process_gcov_data(os.path.join(workdir, fname), covdata, abs_filename, options, dir_)
             Done = True
 
         if not options.keep:
@@ -520,7 +531,7 @@ def process_datafile(filename, covdata, options):
                 for fname in group:
                     if os.path.exists(fname):
                         # Only remove files that actually exist.
-                        os.remove(fname)
+                        os.remove(os.path.join(workdir, fname))
 
     if options.delete:
         if not abs_filename.endswith('gcno'):
@@ -538,7 +549,7 @@ def process_datafile(filename, covdata, options):
 #
 #  Process Already existing gcov files
 #
-def process_existing_gcov_file(filename, covdata, options):
+def process_existing_gcov_file(filename, covdata, options, workdir=None):
     #
     # Ignore this file if it does not match the gcov filter
     #

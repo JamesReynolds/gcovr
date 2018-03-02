@@ -15,6 +15,7 @@ from os.path import normpath
 
 from .coverage import CoverageData
 from .utils import aliases, search_file, Logger
+from .workers import locked_directory
 
 output_re = re.compile("[Cc]reating [`'](.*)'$")
 source_re = re.compile("[Cc]annot open (source|graph) file")
@@ -84,9 +85,7 @@ def is_non_code(code):
 #
 # Process a single gcov datafile
 #
-def process_gcov_data(data_fname, covdata, source_fname, options):
-    logger = Logger(options.verbose)
-
+def process_gcov_data(data_fname, covdata, source_fname, options, currdir=None):
     INPUT = open(data_fname, "r")
 
     # Find the source file
@@ -94,7 +93,7 @@ def process_gcov_data(data_fname, covdata, source_fname, options):
     fname = guess_source_file_name(
         firstline, data_fname, source_fname,
         root_dir=options.root_dir, starting_dir=options.starting_dir,
-        logger=logger)
+        logger=logger, currdir=currdir)
 
     logger.verbose_msg("Parsing coverage data for file {}", fname)
 
@@ -122,16 +121,16 @@ def process_gcov_data(data_fname, covdata, source_fname, options):
 
 
 def guess_source_file_name(
-        line, data_fname, source_fname, root_dir, starting_dir, logger):
+        line, data_fname, source_fname, root_dir, starting_dir, logger, currdir=None):
     segments = line.split(':', 3)
     if len(segments) != 4 or not \
             segments[2].lower().strip().endswith('source'):
         raise RuntimeError(
-            'Fatal error parsing gcov file, line 1: \n\t"%s"' % line.rstrip()
+            'Fatal error parsing gcov file %s, line 1: \n\t"%s"' % (data_fname, line.rstrip())
         )
-
     gcovname = segments[-1].strip()
-    currdir = os.getcwd()
+    if currdir is None:
+        currdir = os.getcwd()
     if source_fname is None:
         fname = guess_source_file_name_via_aliases(
             gcovname, currdir, data_fname)
@@ -512,7 +511,7 @@ class GcovParser(object):
 # identifying the original gcc working directory (there is a bit of
 # trial-and-error here)
 #
-def process_datafile(filename, covdata, options):
+def process_datafile(filename, covdata, options, workdir=None):
     logger = Logger(options.verbose)
 
     logger.verbose_msg("Processing file: {}", filename)
@@ -541,8 +540,13 @@ def process_datafile(filename, covdata, options):
         # Always add the root directory
         potential_wd.append(options.root_dir)
 
+    ## Ensure the working directory for this thread is first (if any)
+    if workdir is not None:
+        potential_wd = [workdir] + potential_wd
+
     # Iterate from the end of the potential_wd list, which is the root
     # directory
+
     #
     # @latk - 2018: not true, this iterates from the start of the list.
     # Is that a bug?
@@ -711,7 +715,7 @@ def select_gcov_files_from_stdout(out, gcov_filter, gcov_exclude, logger, chdir,
 #
 #  Process Already existing gcov files
 #
-def process_existing_gcov_file(filename, covdata, options):
+def process_existing_gcov_file(filename, covdata, options, workdir=None):
     logger = Logger(options.verbose)
 
     filtered, excluded = apply_filter_include_exclude(

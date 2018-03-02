@@ -554,13 +554,12 @@ def process_datafile(filename, covdata, options):
         # NB: either len(potential_wd) == 1, or all entires are absolute
         # paths, so we don't have to chdir(starting_dir) at every
         # iteration.
-        os.chdir(dir_)
 
-        done = run_gcov_and_process_files(
-            abs_filename, dirname, covdata,
-            options=options, logger=logger, errors=errors)
+        with locked_directory(dir_):
+            done = run_gcov_and_process_files(
+                abs_filename, dirname, covdata,
+                options=options, logger=logger, errors=errors, chdir=dir_)
 
-    os.chdir(options.root_dir)
     if options.delete:
         if not abs_filename.endswith('gcno'):
             os.remove(abs_filename)
@@ -628,7 +627,7 @@ def expand_subdirectories(*directories):
 
 
 def run_gcov_and_process_files(
-        abs_filename, dirname, covdata, options, logger, errors):
+        abs_filename, dirname, covdata, options, logger, errors, chdir, tempdir=None):
     # If the first element of cmd - the executable name - has embedded spaces
     # it probably includes extra arguments.
     cmd = options.gcov_cmd.split(' ') + [
@@ -642,10 +641,10 @@ def run_gcov_and_process_files(
     env['LC_ALL'] = 'en_US'
 
     logger.verbose_msg(
-        "Running gcov: '{}' in '{}'", ' '.join(cmd), os.getcwd())
+        "Running gcov: '{}' in '{}'", ' '.join(cmd), chdir)
 
     out, err = subprocess.Popen(
-        cmd, env=env,
+        cmd, env=env, cwd=chdir,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE).communicate()
     out = out.decode('utf-8')
@@ -656,7 +655,9 @@ def run_gcov_and_process_files(
         out,
         gcov_filter=options.gcov_filter,
         gcov_exclude=options.gcov_exclude,
-        logger=logger)
+        logger=logger,
+        chdir=chdir,
+        tempdir=tempdir)
 
     if source_re.search(err):
         # gcov tossed errors: try the next potential_wd
@@ -674,8 +675,7 @@ def run_gcov_and_process_files(
 
     return done
 
-
-def select_gcov_files_from_stdout(out, gcov_filter, gcov_exclude, logger):
+def select_gcov_files_from_stdout(out, gcov_filter, gcov_exclude, logger, chdir, tempdir=None):
     active_files = []
     all_files = []
 
@@ -698,7 +698,12 @@ def select_gcov_files_from_stdout(out, gcov_filter, gcov_exclude, logger):
             logger.verbose_msg("Excluding gcov file {}", fname)
             continue
 
-        active_files.append(fname)
+        if tempdir:
+            import shutil
+            active_files.append(os.path.join(chdir, fname))
+            shutil.move(active_files[-1], os.path.join(tempdir, fname))
+        else:
+            active_files.append(fname)
 
     return active_files, all_files
 

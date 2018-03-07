@@ -408,6 +408,7 @@ def parse_arguments(args):
         dest="gcov_parallel",
         default=1
     )
+
     return parser.parse_args(args=args)
 
 

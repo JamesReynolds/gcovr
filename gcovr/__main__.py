@@ -419,6 +419,7 @@ COPYRIGHT = (
     "the U.S. Government retains certain rights in this software."
 )
 
+
 def main(args=None):
     global options
     options, search_paths = parse_arguments(args)

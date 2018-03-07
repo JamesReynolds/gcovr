@@ -86,6 +86,7 @@ def is_non_code(code):
 # Process a single gcov datafile
 #
 def process_gcov_data(data_fname, covdata, source_fname, options, currdir=None):
+    logger = Logger(options.verbose)
     INPUT = open(data_fname, "r")
 
     # Find the source file
@@ -540,7 +541,7 @@ def process_datafile(filename, covdata, options, workdir=None):
         # Always add the root directory
         potential_wd.append(options.root_dir)
 
-    ## Ensure the working directory for this thread is first (if any)
+    # Ensure the working directory for this thread is first (if any)
     if workdir is not None:
         potential_wd = [workdir] + potential_wd
 
@@ -679,6 +680,7 @@ def run_gcov_and_process_files(
 
     return done
 
+
 def select_gcov_files_from_stdout(out, gcov_filter, gcov_exclude, logger, chdir, tempdir=None):
     active_files = []
     all_files = []
@@ -704,10 +706,10 @@ def select_gcov_files_from_stdout(out, gcov_filter, gcov_exclude, logger, chdir,
 
         if tempdir:
             import shutil
-            active_files.append(os.path.join(chdir, fname))
-            shutil.move(active_files[-1], os.path.join(tempdir, fname))
+            active_files.append(os.path.join(tempdir, fname))
+            shutil.move(os.path.join(chdir, fname), active_files[-1])
         else:
-            active_files.append(fname)
+            active_files.append(os.path.join(chdir, fname))
 
     return active_files, all_files
 

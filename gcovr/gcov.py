@@ -563,7 +563,7 @@ def process_datafile(filename, covdata, options, workdir=None):
         with locked_directory(dir_):
             done = run_gcov_and_process_files(
                 abs_filename, dirname, covdata,
-                options=options, logger=logger, errors=errors, chdir=dir_)
+                options=options, logger=logger, errors=errors, chdir=dir_, tempdir=workdir)
 
     if options.delete:
         if not abs_filename.endswith('gcno'):

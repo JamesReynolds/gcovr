@@ -87,6 +87,13 @@ class WorkThread(Thread):
             kwargs['workdir'] = self.workdir
             work(*args, **kwargs)
 
+    def close(self):
+        """
+        Empty the working directory
+        """
+        import shutil
+        shutil.rmtree(self.workdir)
+
 
 class Workers(object):
     """
@@ -131,3 +138,4 @@ class Workers(object):
             w.start()
         for w in self.workers:
             w.join()
+            w.close()

@@ -14,6 +14,9 @@ from pyutilib.misc.xmltodict import parse as parse_xml
 python_interpreter = sys.executable.replace('\\', '/')  # use forward slash on windows as well
 env = os.environ
 env['GCOVR'] = python_interpreter + ' -m gcovr'
+if sys.version_info < (2, 7):  # pragma: no cover
+    # fallback for "python -m module"
+    env['GCOVR'] = 'gcovr'
 
 basedir = os.path.split(os.path.abspath(__file__))[0]
 
@@ -76,7 +79,7 @@ def run(cmd):
 
 
 def find_reference_files(pattern):
-    for reference in glob.glob("reference/{}".format(pattern)):
+    for reference in glob.glob("reference/" + pattern):
         coverage = os.path.basename(reference)
         yield coverage, reference
 
@@ -120,7 +123,7 @@ def test_build(name, format):
         if assert_equals is not None:
             assert_equals(coverage, reference)
         else:
-            assert coverage == reference, "coverage={}, reference={}".format(
+            assert coverage == reference, "coverage={0}, reference={1}".format(
                 coverage_file, reference_file)
 
     assert run(["make", "clean"])

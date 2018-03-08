@@ -90,7 +90,11 @@ class WorkThread(Thread):
         Empty the working directory
         """
         import shutil
-        shutil.rmtree(self.workdir)
+
+        # On Windows the files may still be in use. This
+        # is unlikely, the files are small, and are in a
+        # temporary directory so we can skip this.
+        shutil.rmtree(self.workdir, ignore_errors=True)
 
 
 class Workers(object):
@@ -136,4 +140,5 @@ class Workers(object):
             w.start()
         for w in self.workers:
             w.join()
+        for w in self.workers:
             w.close()

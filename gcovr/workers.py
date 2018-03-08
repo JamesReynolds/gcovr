@@ -41,7 +41,7 @@ class LockedDirectories(object):
         """
         self.cv.acquire()
         self.dirs.remove(dir_)
-        self.cv.notify()
+        self.cv.notify_all()
         self.cv.release()
 
 

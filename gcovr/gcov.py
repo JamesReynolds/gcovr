@@ -13,7 +13,6 @@ import sys
 
 from os.path import normpath
 
-from .coverage import CoverageData
 from .utils import aliases, search_file, Logger
 from .workers import locked_directory
 
@@ -477,14 +476,12 @@ class GcovParser(object):
         # If the file is already in covdata, then we
         # remove lines that are covered here.  Otherwise,
         # initialize covdata
-        if self.fname not in covdata:
-            covdata[self.fname] = CoverageData(self.fname)
-        covdata[self.fname].update(
-            uncovered=self.uncovered,
-            uncovered_exceptional=self.uncovered_exceptional,
-            covered=self.covered,
-            branches=self.branches,
-            noncode=self.noncode)
+        covdata.update(self.fname,
+                       uncovered=self.uncovered,
+                       uncovered_exceptional=self.uncovered_exceptional,
+                       covered=self.covered,
+                       branches=self.branches,
+                       noncode=self.noncode)
 
 
 #
@@ -683,7 +680,7 @@ def run_gcov_and_process_files(
     return done
 
 
-def select_gcov_files_from_stdout(out, gcov_filter, gcov_exclude, logger, chdir, tempdir=None):
+def select_gcov_files_from_stdout(out, gcov_filter, gcov_exclude, logger, chdir, tempdir):
     active_files = []
     all_files = []
 
@@ -693,7 +690,8 @@ def select_gcov_files_from_stdout(out, gcov_filter, gcov_exclude, logger, chdir,
             continue
 
         fname = found.group(1)
-        all_files.append(fname)
+        full = os.path.join(chdir, fname)
+        all_files.append(full)
 
         filtered, excluded = apply_filter_include_exclude(
             fname, gcov_filter, gcov_exclude)
@@ -706,13 +704,12 @@ def select_gcov_files_from_stdout(out, gcov_filter, gcov_exclude, logger, chdir,
             logger.verbose_msg("Excluding gcov file {0}", fname)
             continue
 
-        if tempdir:
+        if tempdir and tempdir != chdir:
             import shutil
             active_files.append(os.path.join(tempdir, fname))
-            if chdir != tempdir:
-                shutil.copyfile(os.path.join(chdir, fname), active_files[-1])
+            shutil.copyfile(full, active_files[-1])
         else:
-            active_files.append(os.path.join(chdir, fname))
+            active_files.append(full)
 
     return active_files, all_files
 

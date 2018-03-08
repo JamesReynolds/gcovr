@@ -3,18 +3,18 @@
 # This file is part of gcovr <http://gcovr.com/>.
 #
 # Copyright 2013-2018 the gcovr authors
-# Copyright 2013 Sandia Corporation
 # This software is distributed under the BSD license.
 
 
-from threading import Thread, Condition
+from threading import Thread, Condition, Lock
 from contextlib import contextmanager
+from tempfile import mkdtemp
 
 import sys
 if sys.version_info[0] >= 3:
-    from queue import Queue, Empty
+    from queue import Queue
 else:
-    from Queue import Queue, Empty
+    from Queue import Queue
 
 
 class LockedDirectories(object):
@@ -58,43 +58,24 @@ def locked_directory(dir_):
 locked_directory.global_object = LockedDirectories()
 
 
-class WorkThread(Thread):
+def worker(queue):
     """
-    The work thread class continuously gets work and
-    completes it
+    Run work items from the queue until the sentinal
+    None value is hit
     """
-    def __init__(self, pool):
-        """
-        Initialise with a reference to the pool object
-        which houses the queue
-        """
-        super(WorkThread, self).__init__()
-        import tempfile
-        self.pool = pool
-        self.workdir = tempfile.mkdtemp()
+    workdir = mkdtemp()
+    while True:
+        work, args, kwargs = queue.get(True)
+        if not work:
+            break
+        kwargs['workdir'] = workdir
+        work(*args, **kwargs)
 
-    def run(self):
-        """
-        Run until the queue is empty
-        """
-        while True:
-            try:
-                work, args, kwargs = self.pool.get()
-            except Empty:
-                break
-            kwargs['workdir'] = self.workdir
-            work(*args, **kwargs)
-
-    def close(self):
-        """
-        Empty the working directory
-        """
-        import shutil
-
-        # On Windows the files may still be in use. This
-        # is unlikely, the files are small, and are in a
-        # temporary directory so we can skip this.
-        shutil.rmtree(self.workdir, ignore_errors=True)
+    # On Windows the files may still be in use. This
+    # is unlikely, the files are small, and are in a
+    # temporary directory so we can skip this.
+    import shutil
+    shutil.rmtree(workdir, ignore_errors=True)
 
 
 class Workers(object):
@@ -103,15 +84,12 @@ class Workers(object):
     add method and will run until work is complete
     """
 
-    def __init__(self, number=0):
-        """
-        Initialise with a number of workers
-        """
+    def __init__(self, number=1):
+        assert(number >= 1)
         self.q = Queue()
-        if number == 0:
-            from multiprocessing import cpu_count
-            number = cpu_count()
-        self.workers = [WorkThread(self) for _ in range(0, number)]
+        self.workers = [Thread(target=worker, args=(self.q,)) for _ in range(0, number)]
+        for w in self.workers:
+            w.start()
 
     def add(self, work, *args, **kwargs):
         """
@@ -126,19 +104,33 @@ class Workers(object):
         """
         return len(self.workers)
 
-    def get(self):
-        """
-        Get the next piece of work
-        """
-        return self.q.get(False, 5)
-
     def wait(self):
         """
         Wait until all work is complete
         """
         for w in self.workers:
-            w.start()
+            self.add(None)
         for w in self.workers:
             w.join()
-        for w in self.workers:
-            w.close()
+
+
+class LockedDictionary(object):
+    """
+    Locked coverage dictionary object
+    """
+
+    def __init__(self, clz):
+        self.lock = Lock()
+        self.clz = clz
+        self.dict = dict()
+
+    def update(self, key, **kwargs):
+        """
+        Update the dictionary with the supplied kwargs object
+        by ensuring the key is present then updating the underlying
+        object
+        """
+        with self.lock:
+            if key not in self.dict:
+                self.dict[key] = self.clz(key)
+            self.dict[key].update(**kwargs)

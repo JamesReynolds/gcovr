@@ -35,11 +35,13 @@ import sys
 
 from argparse import ArgumentParser, ArgumentTypeError
 from os.path import normpath
+from multiprocessing import cpu_count
 
 from .gcov import get_datafiles, process_existing_gcov_file, process_datafile
 from .utils import get_global_stats, build_filter, Logger
 from .version import __version__
-from .workers import Workers
+from .workers import Workers, LockedDictionary
+from .coverage import CoverageData
 
 # generators
 from .cobertura_xml_generator import print_xml_report
@@ -382,7 +384,7 @@ def parse_arguments(args):
         "-j",
         help="Set the number of threads to use in parallel.",
         nargs="?",
-        const=0,
+        const=cpu_count(),
         type=int,
         dest="gcov_parallel",
         default=1
@@ -480,17 +482,19 @@ def main(args=None):
     datafiles = get_datafiles(options.search_paths, options)
 
     # Get coverage data
-    covdata = {}
+    lockedcovdata = LockedDictionary(CoverageData)
     pool = Workers(options.gcov_parallel)
     if options.verbose:
         print("Pool started with %d workers" % pool.size())
     for file_ in datafiles:
         if options.gcov_files:
-            pool.add(process_existing_gcov_file, file_, covdata, options)
+            pool.add(process_existing_gcov_file, file_, lockedcovdata, options)
         else:
-            pool.add(process_datafile, file_, covdata, options)
+            pool.add(process_datafile, file_, lockedcovdata, options)
     pool.wait()
+    covdata = lockedcovdata.dict
     logger.verbose_msg("Gathered coveraged data for {0} files", len(covdata))
+
     # Print report
     if options.xml or options.prettyxml:
         print_xml_report(covdata, options)

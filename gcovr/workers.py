@@ -63,8 +63,6 @@ def worker(queue, exceptions):
     Run work items from the queue until the sentinal
     None value is hit
     """
-    from threading import current_thread
-    id = current_thread()
     workdir = mkdtemp()
     while True:
         work, args, kwargs = queue.get(True)
@@ -73,11 +71,10 @@ def worker(queue, exceptions):
         kwargs['workdir'] = workdir
         try:
             work(*args, **kwargs)
-        except Exception as exn:
+        except:  # noqa: E722
             import sys
             exceptions.append(sys.exc_info())
             break
-
 
     # On Windows the files may still be in use. This
     # is unlikely, the files are small, and are in a
@@ -96,7 +93,7 @@ class Workers(object):
         assert(number >= 1)
         self.q = Queue()
         self.exceptions = []
-        self.workers = [Thread(target=worker, args=(self.q,self.exceptions)) for _ in range(0, number)]
+        self.workers = [Thread(target=worker, args=(self.q, self.exceptions)) for _ in range(0, number)]
         for w in self.workers:
             w.start()
 
@@ -126,7 +123,6 @@ class Workers(object):
             import traceback
             traceback.print_exception(exc_type, exc_obj, exc_trace)
             raise exc_obj
-
 
 
 class LockedDictionary(object):

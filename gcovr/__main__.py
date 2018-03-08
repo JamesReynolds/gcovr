@@ -484,8 +484,7 @@ def main(args=None):
     # Get coverage data
     lockedcovdata = LockedDictionary(CoverageData)
     pool = Workers(options.gcov_parallel)
-    if options.verbose:
-        print("Pool started with %d workers" % pool.size())
+    logger.verbose_msg("Pool started with {0} threads", pool.size())
     for file_ in datafiles:
         if options.gcov_files:
             pool.add(process_existing_gcov_file, file_, lockedcovdata, options)

@@ -36,11 +36,13 @@ import sys
 from argparse import ArgumentParser, ArgumentTypeError
 from os.path import normpath
 from multiprocessing import cpu_count
+from tempfile import mkdtemp
+from shutil import rmtree
 
 from .gcov import get_datafiles, process_existing_gcov_file, process_datafile
 from .utils import get_global_stats, build_filter, Logger
 from .version import __version__
-from .workers import Workers, LockedDictionary
+from .workers import Workers
 from .coverage import CoverageData
 
 # generators
@@ -482,16 +484,38 @@ def main(args=None):
     datafiles = get_datafiles(options.search_paths, options)
 
     # Get coverage data
-    lockedcovdata = LockedDictionary(CoverageData)
-    pool = Workers(options.gcov_parallel)
+    pool = Workers(options.gcov_parallel, lambda: {
+        'covdata': dict(),
+        'workdir': mkdtemp(),
+        'toerase': set(),
+        'options': options
+    })
     logger.verbose_msg("Pool started with {0} threads", pool.size())
     for file_ in datafiles:
         if options.gcov_files:
-            pool.add(process_existing_gcov_file, file_, lockedcovdata, options)
+            pool.add(process_existing_gcov_file, file_)
         else:
-            pool.add(process_datafile, file_, lockedcovdata, options)
-    pool.wait()
-    covdata = lockedcovdata.dict
+            pool.add(process_datafile, file_)
+    contexts = pool.wait()
+
+    covdata = dict()
+    toerase = set()
+    for context in contexts:
+        for fname, cov in context['covdata'].items():
+            if fname not in covdata:
+                covdata[fname] = CoverageData(fname)
+            covdata[fname].update(
+                uncovered=cov.uncovered,
+                uncovered_exceptional=cov.uncovered_exceptional,
+                covered=cov.covered,
+                branches=cov.branches,
+                noncode=cov.noncode)
+        toerase.update(context['toerase'])
+        rmtree(context['workdir'])
+    for filepath in toerase:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
     logger.verbose_msg("Gathered coveraged data for {0} files", len(covdata))
 
     # Print report

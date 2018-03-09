@@ -6,9 +6,8 @@
 # This software is distributed under the BSD license.
 
 
-from threading import Thread, Condition, Lock
+from threading import Thread, Condition
 from contextlib import contextmanager
-from tempfile import mkdtemp
 
 import sys
 if sys.version_info[0] >= 3:
@@ -58,29 +57,22 @@ def locked_directory(dir_):
 locked_directory.global_object = LockedDirectories()
 
 
-def worker(queue, exceptions):
+def worker(queue, context, exceptions):
     """
     Run work items from the queue until the sentinal
     None value is hit
     """
-    workdir = mkdtemp()
     while True:
         work, args, kwargs = queue.get(True)
         if not work:
             break
-        kwargs['workdir'] = workdir
+        kwargs.update(context)
         try:
             work(*args, **kwargs)
         except:  # noqa: E722
             import sys
             exceptions.append(sys.exc_info())
             break
-
-    # On Windows the files may still be in use. This
-    # is unlikely, the files are small, and are in a
-    # temporary directory so we can skip this.
-    import shutil
-    shutil.rmtree(workdir, ignore_errors=True)
 
 
 class Workers(object):
@@ -89,11 +81,12 @@ class Workers(object):
     add method and will run until work is complete
     """
 
-    def __init__(self, number=1):
+    def __init__(self, number, context):
         assert(number >= 1)
         self.q = Queue()
         self.exceptions = []
-        self.workers = [Thread(target=worker, args=(self.q, self.exceptions)) for _ in range(0, number)]
+        self.contexts = [context() for _ in range(0, number)]
+        self.workers = [Thread(target=worker, args=(self.q, c, self.exceptions)) for c in self.contexts]
         for w in self.workers:
             w.start()
 
@@ -118,30 +111,9 @@ class Workers(object):
             self.add(None)
         for w in self.workers:
             w.join()
-        if self.exceptions:
-            exc_type, exc_obj, exc_trace = self.exceptions[0]
+        for exc_type, exc_obj, exc_trace in self.exceptions:
             import traceback
             traceback.print_exception(exc_type, exc_obj, exc_trace)
-            raise exc_obj
-
-
-class LockedDictionary(object):
-    """
-    Locked coverage dictionary object
-    """
-
-    def __init__(self, clz):
-        self.lock = Lock()
-        self.clz = clz
-        self.dict = dict()
-
-    def update(self, key, **kwargs):
-        """
-        Update the dictionary with the supplied kwargs object
-        by ensuring the key is present then updating the underlying
-        object
-        """
-        with self.lock:
-            if key not in self.dict:
-                self.dict[key] = self.clz(key)
-            self.dict[key].update(**kwargs)
+        if self.exceptions:
+            raise self.exceptions[0][1]
+        return self.contexts

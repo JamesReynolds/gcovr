@@ -11,8 +11,6 @@ import pytest
 
 from ..gcov import GcovParser
 from ..utils import Logger
-from ..coverage import CoverageData
-from ..workers import LockedDictionary
 
 # This example is taken from the GCC 8 Gcov documentation:
 # <https://gcc.gnu.org/onlinedocs/gcc/Invoking-Gcov.html>
@@ -193,9 +191,9 @@ def test_gcov_8(capsys, sourcename):
         exclude_unreachable_branches=False,
         ignore_parse_errors=False)
 
-    covdata = LockedDictionary(CoverageData)
+    covdata = {}
     parser.update_coverage(covdata)
-    coverage = covdata.dict['tmp.cpp']
+    coverage = covdata['tmp.cpp']
 
     uncovered_lines = coverage.uncovered_str(
         exceptional=False, show_branch=False)
@@ -234,9 +232,9 @@ def test_unknown_tags(capsys, ignore_errors):
         with pytest.raises(SystemExit):
             run_the_parser()
 
-    covdata = LockedDictionary(CoverageData)
+    covdata = {}
     parser.update_coverage(covdata)
-    coverage = covdata.dict['foo.c']
+    coverage = covdata['foo.c']
 
     uncovered_lines = coverage.uncovered_str(
         exceptional=False, show_branch=False)

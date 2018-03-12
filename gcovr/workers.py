@@ -69,7 +69,7 @@ def drain(queue):
                 sentinel_count += 1
         except Empty:
             break
-    for _ in range(0, sentinel_count):
+    for _ in range(0, 1 + sentinel_count):
         queue.put((None, None, None))
 
 
@@ -81,6 +81,7 @@ def worker(queue, context, exceptions):
     while True:
         work, args, kwargs = queue.get(True)
         if not work:
+            queue.put((None, None, None))
             break
         kwargs.update(context)
         try:
@@ -128,7 +129,8 @@ class Workers(object):
         for w in self.workers:
             self.add(None)
         for w in self.workers:
-            w.join()
+            while w.is_alive():
+                w.join(timeout=0.1)
         for exc_type, exc_obj, exc_trace in self.exceptions:
             import traceback
             traceback.print_exception(exc_type, exc_obj, exc_trace)

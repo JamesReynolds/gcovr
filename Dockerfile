@@ -25,4 +25,4 @@ COPY ./ gcovr/
 RUN source scl_source enable python27 devtoolset-6 && cd gcovr && pip install --upgrade pip setuptools && pip install -e .
 RUN cd gcovr && pip install --upgrade pip setuptools && pip install -e .
 
-CMD cd gcovr && flake8 --ignore=E501 && source scl_source enable devtoolset-6 && python3.4 -m pytest -v && source scl_source enable python27 && python -m pytest -v
+CMD cd gcovr && flake8 --ignore=E501 && source scl_source enable devtoolset-6 && python3.4 -m pytest -v -x && source scl_source enable python27 && python -m pytest -v -x
